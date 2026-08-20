@@ -1,4 +1,13 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+const getBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (!envUrl || typeof envUrl !== "string" || envUrl.includes("<") || envUrl.includes(">")) {
+    return "http://localhost:4000/api";
+  }
+  const clean = envUrl.trim().replace(/\/+$/, "");
+  return clean.endsWith("/api") ? clean : `${clean}/api`;
+};
+
+const API_BASE_URL = getBaseUrl();
 
 const getHeaders = () => {
   const token = localStorage.getItem("token");
