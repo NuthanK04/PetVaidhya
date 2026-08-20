@@ -37,6 +37,9 @@ export interface VerifyPaymentInput {
   razorpay_signature: string;
 }
 
+// Payment delegate helper for Prisma client compatibility
+const paymentModel = (prisma as any).payment;
+
 // ============================================
 // 1. CREATE PAYMENT ORDER (SERVER VALIDATION)
 // ============================================
@@ -118,7 +121,6 @@ export const createPaymentOrder = async (input: CreateOrderInput) => {
     const appDate = appointmentDate ? new Date(appointmentDate) : new Date();
 
     // Create Appointment in PENDING state
-    // If vet id not found in DB, link to first available vet
     let finalVetId = veterinarianId;
     if (!finalVetId || finalVetId === "default-vet") {
       const firstVet = await prisma.veterinarian.findFirst();
@@ -207,7 +209,7 @@ export const createPaymentOrder = async (input: CreateOrderInput) => {
   const amountInPaise = Math.round(totalAmount * 100);
   const receipt = `rcpt_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-  const razorpayOrder = await razorpayInstance.orders.create({
+  const razorpayOrder: any = await razorpayInstance.orders.create({
     amount: amountInPaise,
     currency: "INR",
     receipt,
@@ -223,7 +225,7 @@ export const createPaymentOrder = async (input: CreateOrderInput) => {
   // ----------------------------------------
   // D. STORE PAYMENT RECORD IN POSTGRESQL
   // ----------------------------------------
-  const payment = await prisma.payment.create({
+  const payment = await paymentModel.create({
     data: {
       userId,
       appointmentId: appointmentRecord?.id || null,
@@ -274,7 +276,7 @@ export const verifyPaymentSignature = async (input: VerifyPaymentInput) => {
 
   if (expectedSignature !== razorpay_signature) {
     // Record failure in DB
-    await prisma.payment.updateMany({
+    await paymentModel.updateMany({
       where: { razorpayOrderId: razorpay_order_id },
       data: { status: "FAILED" },
     });
@@ -282,12 +284,8 @@ export const verifyPaymentSignature = async (input: VerifyPaymentInput) => {
   }
 
   // 2. Find payment record by Razorpay order ID
-  const payment = await prisma.payment.findUnique({
+  const payment = await paymentModel.findFirst({
     where: { razorpayOrderId: razorpay_order_id },
-    include: {
-      appointment: true,
-      booking: true,
-    },
   });
 
   if (!payment) {
@@ -310,7 +308,7 @@ export const verifyPaymentSignature = async (input: VerifyPaymentInput) => {
   }
 
   // 3. Update Payment record to SUCCESS
-  const updatedPayment = await prisma.payment.update({
+  const updatedPayment = await paymentModel.update({
     where: { id: payment.id },
     data: {
       razorpayPaymentId: razorpay_payment_id,
@@ -396,7 +394,7 @@ export const handleRazorpayWebhook = async (
     return { received: true, message: "No order ID in webhook payload" };
   }
 
-  const payment = await prisma.payment.findUnique({
+  const payment = await paymentModel.findFirst({
     where: { razorpayOrderId: orderId },
   });
 
@@ -409,7 +407,7 @@ export const handleRazorpayWebhook = async (
     (eventType === "payment.captured" || eventType === "order.paid") &&
     payment.status !== "SUCCESS"
   ) {
-    await prisma.payment.update({
+    await paymentModel.update({
       where: { id: payment.id },
       data: {
         razorpayPaymentId: paymentId || payment.razorpayPaymentId,
@@ -445,7 +443,7 @@ export const handleRazorpayWebhook = async (
 
   // Handle failed payment
   else if (eventType === "payment.failed" && payment.status !== "SUCCESS") {
-    await prisma.payment.update({
+    await paymentModel.update({
       where: { id: payment.id },
       data: {
         razorpayPaymentId: paymentId || payment.razorpayPaymentId,
