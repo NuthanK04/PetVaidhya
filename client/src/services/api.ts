@@ -1,6 +1,12 @@
 const getBaseUrl = (): string => {
-  const envUrl = import.meta.env.VITE_API_URL;
-  if (!envUrl || typeof envUrl !== "string" || envUrl.includes("<") || envUrl.includes(">")) {
+  let envUrl = import.meta.env.VITE_API_URL;
+  if (
+    !envUrl ||
+    typeof envUrl !== "string" ||
+    envUrl.includes("<") ||
+    envUrl.includes(">") ||
+    envUrl.includes("pet-vaidya.vercel.app")
+  ) {
     if (typeof window !== "undefined" && window.location.hostname.includes("vercel.app")) {
       return "https://pet-vaidhya.vercel.app/api";
     }
