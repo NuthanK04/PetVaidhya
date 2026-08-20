@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { api } from "../services/api";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -35,20 +36,9 @@ export default function Login() {
     const cleanIdentifier = email.trim();
 
     try {
-      const response = await fetch("http://localhost:4000/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          identifier: cleanIdentifier,
-          password,
-        }),
-      });
+      const result = await api.login(cleanIdentifier, password);
 
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
+      if (!result.success) {
         throw new Error(result.message || "Invalid email or password");
       }
 

@@ -52,7 +52,11 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-app.listen(PORT, async () => {
-  console.log(`🐾 Pet Vaidya API running on http://localhost:${PORT}`);
-  await seedInitialData();
-});
+if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+  app.listen(PORT, async () => {
+    console.log(`🐾 Pet Vaidya API running on http://localhost:${PORT}`);
+    await seedInitialData();
+  });
+}
+
+export default app;

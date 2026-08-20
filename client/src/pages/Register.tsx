@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   User,
 } from "lucide-react";
+import { api } from "../services/api";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -57,23 +58,15 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:4000/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: cleanName,
-          email: cleanEmail !== "" ? cleanEmail : undefined,
-          phoneNumber: cleanPhone !== "" ? cleanPhone : undefined,
-          password,
-          role: "PET_OWNER",
-        }),
+      const result = await api.register({
+        name: cleanName,
+        email: cleanEmail !== "" ? cleanEmail : undefined,
+        phoneNumber: cleanPhone !== "" ? cleanPhone : undefined,
+        password,
+        role: "PET_OWNER",
       });
 
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
+      if (!result.success) {
         throw new Error(result.message || "Registration failed");
       }
 
