@@ -17,7 +17,14 @@ const app = express();
 
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-razorpay-signature"],
+  })
+);
 
 // Capture raw body buffer for Razorpay webhook HMAC SHA-256 verification
 app.use(
