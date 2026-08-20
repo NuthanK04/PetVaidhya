@@ -1,0 +1,520 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  PET_OWNER
+  VETERINARIAN
+  SERVICE_PROVIDER
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+enum AppointmentType {
+  CLINIC_VISIT
+  HOME_VISIT
+  ONLINE_CONSULTATION
+  EMERGENCY
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  REJECTED
+}
+
+enum ServiceCategory {
+  VETERINARY
+  GROOMING
+  BATHING
+  PET_WALKING
+  PET_SITTING
+  BOARDING
+  PET_TRANSPORT
+  OTHER
+}
+
+enum PricingType {
+  FIXED
+  PER_HOUR
+  PER_DAY
+  PER_SESSION
+  PER_KM
+}
+
+enum DiscountType {
+  FIXED
+  PERCENTAGE
+}
+
+enum CouponScope {
+  ALL
+  VETERINARY
+  GROOMING
+  BATHING
+  PET_WALKING
+  PET_SITTING
+  BOARDING
+  PET_TRANSPORT
+}
+
+enum PaymentStatus {
+  CREATED
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentMethod {
+  RAZORPAY
+  CASH
+  OTHER
+}
+
+enum TokenTransactionType {
+  EARNED
+  USED
+  REFUND
+  BONUS
+  EXPIRED
+  ADMIN_ADJUSTMENT
+}
+
+enum RecordType {
+  DIAGNOSIS
+  TREATMENT
+  PRESCRIPTION
+  GENERAL
+}
+
+model User {
+  id                   String             @id @default(cuid())
+  name                 String
+  email                String?            @unique
+  phoneNumber          String?            @unique
+  passwordHash         String
+  role                 UserRole           @default(PET_OWNER)
+  profileImage         String?
+  isVerified           Boolean            @default(false)
+  tokenBalance         Int                @default(0)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  pets                 Pet[]
+  veterinarian         Veterinarian?
+  serviceProvider      ServiceProvider?
+
+  appointments         Appointment[]      @relation("OwnerAppointments")
+  bookings             Booking[]          @relation("OwnerBookings")
+
+  reviews              Review[]
+  couponUsages         CouponUsage[]
+  tokenTransactions    TokenTransaction[]
+  payments             Payment[]
+
+  medicalRecords       MedicalRecord[]    @relation("RecordCreatedBy")
+  vaccinationsCreated  Vaccination[]      @relation("VaccinationCreatedBy")
+}
+
+model Pet {
+  id             String           @id @default(cuid())
+  ownerId        String
+  name           String
+  species        String
+  breed          String?
+  gender         Gender           @default(UNKNOWN)
+  dateOfBirth    DateTime?
+  weightKg       Float?
+  profileImage   String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  owner          User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  appointments   Appointment[]
+  bookings       Booking[]
+  medicalRecords MedicalRecord[]
+  vaccinations   Vaccination[]
+
+  @@index([ownerId])
+}
+
+model Veterinarian {
+  id                  String          @id @default(cuid())
+  userId              String          @unique
+  clinicName          String?
+  specialization      String?
+  qualification       String?
+  experienceYears     Int?
+  consultationFee     Decimal         @db.Decimal(10, 2)
+  bio                 String?
+  address             String?
+  city                String?
+  state               String?
+  postalCode          String?
+  latitude            Decimal?        @db.Decimal(10, 7)
+  longitude           Decimal?        @db.Decimal(10, 7)
+  homeVisitAvailable  Boolean         @default(false)
+  onlineAvailable     Boolean         @default(false)
+  emergencyAvailable  Boolean         @default(false)
+  verified            Boolean         @default(false)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  appointments        Appointment[]
+  bookings            Booking[]
+  medicalRecords      MedicalRecord[]
+  vaccinations        Vaccination[]
+  reviews             Review[]
+}
+
+model ServiceProvider {
+  id             String           @id @default(cuid())
+  userId         String           @unique
+  businessName   String
+  description    String?
+  address        String?
+  city           String?
+  state          String?
+  postalCode     String?
+  latitude       Decimal?         @db.Decimal(10, 7)
+  longitude      Decimal?         @db.Decimal(10, 7)
+  verified       Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  services       Service[]
+  bookings       Booking[]
+  reviews        Review[]
+}
+
+model Service {
+  id             String           @id @default(cuid())
+  providerId     String?
+  name           String
+  description    String?
+  category       ServiceCategory
+  pricingType    PricingType      @default(FIXED)
+  basePrice      Decimal          @db.Decimal(10, 2)
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  provider       ServiceProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+
+  bookings       Booking[]
+
+  @@index([category])
+  @@index([providerId])
+}
+
+model Appointment {
+  id                String          @id @default(cuid())
+  petId             String
+  ownerId           String
+  veterinarianId    String
+
+  appointmentDate   DateTime
+  appointmentTime   String
+  type              AppointmentType
+  status            BookingStatus   @default(PENDING)
+
+  reason            String?
+  notes             String?
+
+  consultationFee   Decimal         @db.Decimal(10, 2)
+  homeVisitFee      Decimal         @default(0) @db.Decimal(10, 2)
+  travelFee         Decimal         @default(0) @db.Decimal(10, 2)
+  totalAmount       Decimal         @db.Decimal(10, 2)
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  pet               Pet             @relation(fields: [petId], references: [id], onDelete: Cascade)
+  owner             User            @relation("OwnerAppointments", fields: [ownerId], references: [id], onDelete: Cascade)
+  veterinarian      Veterinarian    @relation(fields: [veterinarianId], references: [id], onDelete: Cascade)
+
+  medicalRecord     MedicalRecord?
+  payment           Payment?
+
+  @@index([petId])
+  @@index([ownerId])
+  @@index([veterinarianId])
+  @@index([appointmentDate])
+}
+
+model Booking {
+  id                 String            @id @default(cuid())
+  bookingNumber      String            @unique
+
+  ownerId            String
+  petId              String
+  serviceId          String?
+  veterinarianId     String?
+  serviceProviderId  String?
+
+  status             BookingStatus     @default(PENDING)
+
+  scheduledStart     DateTime
+  scheduledEnd       DateTime?
+  quantity           Int               @default(1)
+
+  baseAmount         Decimal           @db.Decimal(10, 2)
+  additionalCharges  Decimal           @default(0) @db.Decimal(10, 2)
+  subtotalAmount     Decimal           @db.Decimal(10, 2)
+
+  discountAmount     Decimal           @default(0) @db.Decimal(10, 2)
+  tokenDiscount      Decimal           @default(0) @db.Decimal(10, 2)
+
+  platformFee        Decimal           @default(0) @db.Decimal(10, 2)
+  taxAmount          Decimal           @default(0) @db.Decimal(10, 2)
+  totalAmount        Decimal           @db.Decimal(10, 2)
+
+  address            String?
+  notes              String?
+
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  owner              User              @relation("OwnerBookings", fields: [ownerId], references: [id], onDelete: Cascade)
+  pet                Pet               @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  service            Service?          @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  veterinarian       Veterinarian?     @relation(fields: [veterinarianId], references: [id], onDelete: SetNull)
+  serviceProvider    ServiceProvider?  @relation(fields: [serviceProviderId], references: [id], onDelete: SetNull)
+
+  couponUsage        CouponUsage?
+  tokenTransactions  TokenTransaction[]
+  payment            Payment?
+  review             Review?
+  invoice            Invoice?
+
+  @@index([ownerId])
+  @@index([petId])
+  @@index([serviceId])
+  @@index([veterinarianId])
+  @@index([serviceProviderId])
+  @@index([status])
+}
+
+model Coupon {
+  id                    String         @id @default(cuid())
+
+  code                  String         @unique
+  description           String?
+
+  discountType          DiscountType
+  discountValue         Decimal        @db.Decimal(10, 2)
+
+  minimumOrderAmount    Decimal        @default(0) @db.Decimal(10, 2)
+  maximumDiscount       Decimal?       @db.Decimal(10, 2)
+
+  scope                 CouponScope    @default(ALL)
+
+  usageLimit            Int?
+  usageCount            Int            @default(0)
+
+  firstOrderOnly        Boolean        @default(false)
+
+  startDate             DateTime
+  expiryDate            DateTime?
+
+  isActive              Boolean        @default(true)
+
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  usages                CouponUsage[]
+}
+
+model CouponUsage {
+  id                String      @id @default(cuid())
+
+  couponId          String
+  userId            String
+  bookingId         String       @unique
+
+  discountAmount    Decimal      @db.Decimal(10, 2)
+
+  usedAt            DateTime    @default(now())
+
+  coupon            Coupon      @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking           Booking     @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([couponId])
+  @@index([userId])
+}
+
+model TokenTransaction {
+  id             String                @id @default(cuid())
+  userId         String
+  bookingId      String?
+
+  amount         Int
+  type           TokenTransactionType
+
+  description    String?
+
+  createdAt      DateTime              @default(now())
+
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking        Booking?              @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([bookingId])
+}
+
+model Payment {
+  id                String         @id @default(cuid())
+
+  userId            String
+  bookingId         String?        @unique
+  appointmentId     String?        @unique
+
+  amount            Decimal        @db.Decimal(10, 2)
+  currency          String         @default("INR")
+
+  paymentMethod     PaymentMethod  @default(RAZORPAY)
+  transactionId     String?        @unique
+
+  razorpayOrderId   String?        @unique
+  razorpayPaymentId String?        @unique
+  razorpaySignature String?
+
+  status            PaymentStatus  @default(PENDING)
+
+  paidAt            DateTime?
+
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking           Booking?       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  appointment       Appointment?   @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  invoice           Invoice?
+
+  @@index([userId])
+  @@index([status])
+  @@index([razorpayOrderId])
+}
+
+model Invoice {
+  id             String    @id @default(cuid())
+
+  invoiceNumber  String    @unique
+
+  bookingId      String    @unique
+  paymentId      String    @unique
+
+  subtotal       Decimal   @db.Decimal(10, 2)
+  discount       Decimal   @default(0) @db.Decimal(10, 2)
+  tokenDiscount  Decimal   @default(0) @db.Decimal(10, 2)
+  platformFee    Decimal   @default(0) @db.Decimal(10, 2)
+  tax            Decimal   @default(0) @db.Decimal(10, 2)
+  total          Decimal   @db.Decimal(10, 2)
+
+  createdAt      DateTime  @default(now())
+
+  booking        Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  payment        Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+}
+
+model MedicalRecord {
+  id               String         @id @default(cuid())
+
+  petId            String
+  veterinarianId   String
+  createdById      String
+
+  appointmentId    String?        @unique
+
+  type             RecordType     @default(GENERAL)
+
+  diagnosis        String?
+  treatment        String?
+  prescription     String?
+  notes            String?
+
+  recordDate       DateTime       @default(now())
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  pet              Pet            @relation(fields: [petId], references: [id], onDelete: Cascade)
+  veterinarian     Veterinarian   @relation(fields: [veterinarianId], references: [id], onDelete: Cascade)
+  createdBy        User           @relation("RecordCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  appointment      Appointment?   @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([petId])
+  @@index([veterinarianId])
+}
+
+model Vaccination {
+  id                String          @id @default(cuid())
+
+  petId             String
+  veterinarianId    String?
+  createdById       String
+
+  vaccineName       String
+  vaccinationDate   DateTime
+  nextDueDate       DateTime?
+
+  batchNumber       String?
+  notes             String?
+
+  createdAt         DateTime        @default(now())
+
+  pet               Pet             @relation(fields: [petId], references: [id], onDelete: Cascade)
+  veterinarian      Veterinarian?   @relation(fields: [veterinarianId], references: [id], onDelete: SetNull)
+  createdBy         User            @relation("VaccinationCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([petId])
+  @@index([nextDueDate])
+}
+
+model Review {
+  id                 String            @id @default(cuid())
+
+  userId             String
+  bookingId          String            @unique
+
+  veterinarianId     String?
+  serviceProviderId  String?
+
+  rating             Int
+  comment            String?
+
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking            Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  veterinarian       Veterinarian?     @relation(fields: [veterinarianId], references: [id], onDelete: SetNull)
+  serviceProvider    ServiceProvider? @relation(fields: [serviceProviderId], references: [id], onDelete: SetNull)
+
+  @@index([veterinarianId])
+  @@index([serviceProviderId])
+}
